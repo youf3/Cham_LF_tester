@@ -1,0 +1,6 @@
+[submodule "fio"]
+	path = fio
+	url = https://github.com/axboe/fio.git
+[submodule "iperf"]
+	path = iperf
+	url = https://github.com/esnet/iperf.git
