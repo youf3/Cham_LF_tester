@@ -6,12 +6,12 @@ This is a set of tools for testing Large Flow transfers on Chameleon Cloud (http
 
 To get started with the tool, you will need two nodes, namely server and tester, and a shared network between them.
 You can use the following sample heat template to create nodes and the network.
-https://gist.githubusercontent.com/youf3/dec5073e44ab0c808fcfe49602fab0f6/raw/c2d0e9526f8bd29821ca9629a60fb62b9cdfc84c/Cham_dtn_network.yaml
+https://gist.githubusercontent.com/youf3/dec5073e44ab0c808fcfe49602fab0f6/raw/1cc10f0ee6513b3af6299813e9c054c689e3ac2a/Cham_LF_network.yaml
 
 For both nodes, retrieve the testing tool using
 
 ```
-git clone --recursive https://github.com/youf3/Cham_dtn_tester.git
+git clone --recursive https://github.com/youf3/Cham_LF_tester.git
 sudo ./install_dep.bash
 make
 sudo make install
