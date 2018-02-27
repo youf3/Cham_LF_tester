@@ -1,6 +1,6 @@
-# Cham_dtn_tester
+# Cham_LF_tester
 
-This is a set of tools for testing high-speed transfers on Chameleon Cloud (https://www.chameleoncloud.org).
+This is a set of tools for testing Large Flow transfers on Chameleon Cloud (https://www.chameleoncloud.org).
 
 ## Getting Started
 
