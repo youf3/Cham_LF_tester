@@ -4,7 +4,9 @@ This is a set of tools for testing high-speed transfers on Chameleon Cloud (http
 
 ## Getting Started
 
-To get started with the tool, use the following commands.
+To get started with the tool, you will need two nodes, namely server and tester, and network between them.
+
+For both nodes, retrieve the testing tool using
 
 ```
 git clone --recursive https://github.com/youf3/Cham_dtn_tester.git
@@ -15,7 +17,7 @@ sudo make install
 
 ## Setup server
 
-A server is a receiver for transfer and optionally a network emulator.
+A server is a receiver in the transfer test and optionally a network emulator.
 You can set the network emulation by
 ```
 sudo ./set_network_delay.bash -s
