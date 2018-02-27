@@ -24,7 +24,7 @@ sudo ./set_network_delay.bash -s
 You need to set the following the variables in the "set_network_delay.bash"
 ```
 nic=eno1 # network interface to use
-delay=30 # network delay
+delay=30 # network delay in millisecond
 jitter=3 # jitter in normal distribution
 ```
 
