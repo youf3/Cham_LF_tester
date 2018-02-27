@@ -4,7 +4,9 @@ This is a set of tools for testing high-speed transfers on Chameleon Cloud (http
 
 ## Getting Started
 
-To get started with the tool, you will need two nodes, namely server and tester, and network between them.
+To get started with the tool, you will need two nodes, namely server and tester, and a shared network between them.
+You can use the following sample heat template to create nodes and the network.
+https://gist.githubusercontent.com/youf3/dec5073e44ab0c808fcfe49602fab0f6/raw/c2d0e9526f8bd29821ca9629a60fb62b9cdfc84c/Cham_dtn_network.yaml
 
 For both nodes, retrieve the testing tool using
 
