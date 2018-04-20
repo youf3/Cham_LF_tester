@@ -14,7 +14,7 @@ rm test
 disk_test(){
     if [ ! -f data.dat ]; then
     echo "Generating test data"
-    fio --thread --direct=1 --rw=write --norandommap --randrepeat=0 --bs=1M --numjobs=8 --ioengine=sync --runtime=30 --group_reporting --time_based --iodepth=32 --name=drive0 --size=10G --filename=data.dat
+    fio --thread --direct=1 --rw=read --norandommap --randrepeat=0 --bs=1M --numjobs=8 --ioengine=sync --runtime=30 --group_reporting --time_based --iodepth=32 --name=drive0 --size=10G --filename=data.dat
     fi
 
 nuttcp -t -vv -i1 -sdz -p5002 -T30s $server_ip < data.dat
