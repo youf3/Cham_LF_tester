@@ -12,6 +12,7 @@ Retrieve the testing tool on each node using the following command.
 
 ```
 git clone --recursive https://github.com/youf3/Cham_LF_tester.git
+cd Cham_LF_tester
 sudo ./install_dep.bash
 make
 sudo make install
