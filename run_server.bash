@@ -1,6 +1,7 @@
 #!/bin/bash
 
-nuttcp -1 -p5002 -sdz > data.dat
+fio --ioengine=posixaio --direct=1 --gtod_reduce=1 --name=test --filename=~/data.dat --bs=1M --iodepth=64 --size=4G --readwrite=write
+nuttcp -1 -p5002 -sdz > ~/data.dat
 iperf3 -s -p5001
 
 #tmux new-session -d -s "server_instances" "nuttcp -1 -p5002 -sdz < data.dat; iperf3 -s -p5001"
