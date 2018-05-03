@@ -1,5 +1,10 @@
 #!/bin/bash
-server_ip=192.168.1.11
+
+if [ "$1"="" ]; then
+    echo "usage : $0 ipaddr"
+fi
+
+server_ip=$1
 
 mem_test(){
 iperf3 -c $server_ip -Z -p 5001 -t30s
