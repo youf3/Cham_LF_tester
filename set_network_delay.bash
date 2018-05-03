@@ -1,7 +1,7 @@
 #!/bin/bash
 
 nic=eno1
-delay=30
+delay=100
 jitter=3
 
 
