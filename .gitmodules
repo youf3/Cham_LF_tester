@@ -4,3 +4,6 @@
 [submodule "iperf"]
 	path = iperf
 	url = https://github.com/esnet/iperf.git
+[submodule "bwctl"]
+	path = bwctl
+	url = https://github.com/perfsonar/bwctl.git
