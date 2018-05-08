@@ -44,12 +44,7 @@ sudo ./set_network_delay.bash -u
 ```
 
 ## Run tester
-You need to modify the variables in the "run_test.bash"
+Run the test using the following command.
 ```
-server_ip=192.168.1.11 #ip address of the server
-```
-
-Then run the test using the following command.
-```
-./run_test.bash
+./run_test.bash server_ip
 ```
