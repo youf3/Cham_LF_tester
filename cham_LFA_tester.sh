@@ -21,7 +21,7 @@ function set_cc_site {
     if [ "$1" = "uc" ]; then
 	export OS_AUTH_URL=https://chi.uc.chameleoncloud.org:5000/v3
 	export OS_REGION_NAME="CHI@UC"
-	export OS_PROJECT_ID="b5f87dc43f85462bb0e809eeb976cd86"
+	export OS_PROJECT_ID="14eb22ff371243ed9f3096953df6c92a"
     elif [ "$1" = "tacc" ]; then
 	export OS_AUTH_URL=https://chi.tacc.chameleoncloud.org:5000/v3
 	export OS_REGION_NAME="CHI@TACC"
