@@ -13,13 +13,13 @@ duration=60
 
 #OS_USERNAME_INPUT=
 #OS_PASSWORD_INPUT=
+#export OS_PROJECT_NAME=
+#export OS_PROJECT_ID=
 
-stack_name="dtnstack"
+stack_name="test"
 
 function set_cc_site {
-    export OS_PROJECT_NAME="CH-820096"
-    export OS_PROJECT_ID="14eb22ff371243ed9f3096953df6c92a"
-    
+
     if [ "$1" = "uc" ]; then
 	export OS_AUTH_URL=https://chi.uc.chameleoncloud.org:5000/v3
 	export OS_REGION_NAME="CHI@UC"
@@ -77,6 +77,33 @@ function set_auth {
     export OS_IDENTITY_API_VERSION=3
 }
 
+function set_project {
+  
+    if [ "$OS_PROJECT_NAME" == ""  ]; then
+	projects=($(openstack project list|gawk -F'| ' 'NF > 1 {print $4 " " $2}'))
+	size=($(expr ${#projects[@]} / 2))
+	
+	echo "Please choose the project you are using for stack $stack_name"
+	for (( i=1; i<size+1; i++  )); do
+	    index=($(expr $i \* 2 - 1))
+	    echo $i: ${projects[index]}
+	done
+	
+    fi
+    
+    read -r project_num
+    project_number=($(expr $project_num \* 2 - 1))
+
+    if [ "${projects[$project_number]}" == "" ] ; then
+	echo "Project $project_num does not exist"
+	exit 5
+    fi    
+    
+    export OS_PROJECT_NAME=${projects[$project_number]}
+    export OS_PROJECT_ID=${projects[$project_number+1]}
+}
+
+
 function get_ip {
     ips=($(openstack stack show $1 | gawk '/output_value:/{flag=1} ; / links|description /{flag=0} flag' | cut -f 3 -d "|"))
     if [ "${#ips[@]}" -eq 13 ] && [ "${ips[2]}" != "''" ] && [ "${ips[8]}" != "''" ];then
@@ -90,6 +117,7 @@ function get_ip {
 function test_conn {
     argv=($@)
     for (( j=0; j<4; j++ )); do
+	#echo "Testing connection to ${argv[$j]}"
 	ssh  -o StrictHostKeyChecking=no cc@${argv[j]} exit
 	if [ "$?" -ne "0" ]; then
 	    echo "Cannot connect to ${argv[j]}"
@@ -140,6 +168,14 @@ function run_cl {
     tmux attach -t "cham_dtn_tester"
 }
 
+function run_cl_within {
+    echo "Testing Connection within CC"
+
+    tmux new-session -d -s "cham_dtn_tester" "ssh -tt -o StrictHostKeyChecking=no cc@$1 iperf3 -c ${2} -t ${duration}s;read -p \"Press enter to exit *(Note: you will lose the output)*\" "
+    tmux split-window -v -t "cham_dtn_tester" "ssh -tt -o StrictHostKeyChecking=no cc@$3 iperf3 -c ${4} -t ${duration}s;read -p \"Press enter to exit *(Note: you will lose the output)*\""
+
+}
+
 if [ "$1" = "uc" ] || [ "$1" = "tacc" ] ; then
     set_cc_site $1
 else    
@@ -148,9 +184,9 @@ else
     exit 0
 fi
 
-if [ "$2" != "sl" ] && [ "$2" != "cha" ]; then
+if [ "$2" != "sl" ] && [ "$2" != "cha" ] && [ "$2" != "" ]; then
     echo "Please specify either sl or cha as testing site name"
-    echo "Usage : $0 {uc | tacc} {sl | cha}"
+    echo "Usage : $0 {uc | tacc} [sl | cha]"
     exit 1
 fi
 
@@ -160,6 +196,8 @@ check_dependency
 echo "Checking Authentication"
 set_auth
 
+set_project
+
 echo "Getting IP from $1"
 cham_ip=($(get_ip "$stack_name"))
 
@@ -168,9 +206,14 @@ if [ "$?" -ne "0" ]; then
     exit 3
 fi
 
-if [ "$2" = "sl" ]; then
+if [ "$2" = "" ]; then
+    echo "Running test within site cc@$1"
+    run_server "${cham_ip[@]}"
+    run_cl_within "${cham_ip[@]}"
+    
+elif [ "$2" = "sl" ]; then
     run_cl_sl "${cham_ip[@]}" "$SL_DTN" "${SL_DTN_PORTS[@]}"
-else
+elif [ "$2" = "cha" ]; then 
     if [ "$1" = "tacc" ]; then
 	echo "Getting IP from uc"
 	set_cc_site "uc"
