@@ -18,6 +18,8 @@ duration=60
 
 stack_name="test"
 
+tester_stack_name="test2"
+
 function set_cc_site {
 
     if [ "$1" = "uc" ]; then
@@ -81,6 +83,12 @@ function set_project {
   
     if [ "$OS_PROJECT_NAME" == ""  ]; then
 	projects=($(openstack project list|gawk -F'| ' 'NF > 1 {print $4 " " $2}'))
+
+	if [ "$projects" == "" ]; then
+	    echo "Incorrect password"
+	    exit 6
+	fi
+	
 	size=($(expr ${#projects[@]} / 2))
 	
 	echo "Please choose the project you are using for stack $stack_name"
@@ -170,11 +178,10 @@ function run_cl {
 
 function run_cl_within {
     echo "Testing Connection within CC"
-    echo "ssh -tt -o StrictHostKeyChecking=no cc@$1 iperf3 -c ${2} -t ${duration}s;read -p \"Press enter to exit *(Note: you will lose the output)*\" "
-    echo "ssh -tt -o StrictHostKeyChecking=no cc@$3 iperf3 -c ${4} -t ${duration}s;read -p \"Press enter to exit *(Note: you will lose the output)*\""
 
     tmux new-session -d -s "cham_dtn_tester" "ssh -tt -o StrictHostKeyChecking=no cc@$1 iperf3 -c ${2} -t ${duration}s;read -p \"Press enter to exit *(Note: you will lose the output)*\" "
-    tmux split-window -v -t "cham_dtn_tester" "ssh -tt -o StrictHostKeyChecking=no cc@$3 iperf3 -c ${4} -t ${duration}s;read -p \"Press enter to exit *(Note: you will lose the output)*\""
+    tmux set-window-option synchronize-panes on
+    tmux split-window -v -t "cham_dtn_tester" "ssh -tt -o StrictHostKeyChecking=no cc@$2 iperf3 -c ${3} -t ${duration}s;read -p \"Press enter to exit *(Note: you will lose the output)*\""
     tmux attach -t "cham_dtn_tester"
 }
 
@@ -210,8 +217,19 @@ fi
 
 if [ "$2" = "" ]; then
     echo "Running test within site cc@$1"
-    run_server "${cham_ip[@]}"
-    run_cl_within "${cham_ip[@]}"
+    tmux kill-session -t "cham_dtn_server"  > /dev/null 2>&1
+    tmux kill-session -t "cham_dtn_tester"  > /dev/null 2>&1
+
+    remote_ips=($(get_ip "$tester_stack_name"))
+
+    echo "Starting server"
+    run_server "${remote_ips[@]}"
+    sleep 1
+  
+    run_cl "${cham_ip[@]}" "${remote_ips[@]}"
+
+    echo "Stopping server" 
+    tmux kill-session -t "cham_dtn_server" 
     
 elif [ "$2" = "sl" ]; then
     run_cl_sl "${cham_ip[@]}" "$SL_DTN" "${SL_DTN_PORTS[@]}"
