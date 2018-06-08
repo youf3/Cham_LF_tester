@@ -170,10 +170,12 @@ function run_cl {
 
 function run_cl_within {
     echo "Testing Connection within CC"
+    echo "ssh -tt -o StrictHostKeyChecking=no cc@$1 iperf3 -c ${2} -t ${duration}s;read -p \"Press enter to exit *(Note: you will lose the output)*\" "
+    echo "ssh -tt -o StrictHostKeyChecking=no cc@$3 iperf3 -c ${4} -t ${duration}s;read -p \"Press enter to exit *(Note: you will lose the output)*\""
 
     tmux new-session -d -s "cham_dtn_tester" "ssh -tt -o StrictHostKeyChecking=no cc@$1 iperf3 -c ${2} -t ${duration}s;read -p \"Press enter to exit *(Note: you will lose the output)*\" "
     tmux split-window -v -t "cham_dtn_tester" "ssh -tt -o StrictHostKeyChecking=no cc@$3 iperf3 -c ${4} -t ${duration}s;read -p \"Press enter to exit *(Note: you will lose the output)*\""
-
+    tmux attach -t "cham_dtn_tester"
 }
 
 if [ "$1" = "uc" ] || [ "$1" = "tacc" ] ; then
