@@ -16,9 +16,8 @@ duration=60
 #export OS_PROJECT_NAME=
 #export OS_PROJECT_ID=
 
-stack_name="test"
-
-tester_stack_name="test2"
+stack_name=""
+tester_stack_name=""
 
 function set_cc_site {
 
@@ -197,6 +196,11 @@ if [ "$2" != "sl" ] && [ "$2" != "cha" ] && [ "$2" != "" ]; then
     echo "Please specify either sl or cha as testing site name"
     echo "Usage : $0 {uc | tacc} [sl | cha]"
     exit 1
+fi
+
+if [ -z "$stack_name" ] || [ -z "$tester_stack_name" ] ; then
+    echo "Please set \$stack_name and \$tester_stack_name in the script."
+    exit 8
 fi
 
 echo "Checking dependency"
