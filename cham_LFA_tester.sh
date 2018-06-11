@@ -228,7 +228,7 @@ if [ "$2" = "" ]; then
 
     echo "Starting server"
     run_server "${remote_ips[@]}"
-    sleep 1
+    sleep 3
   
     run_cl "${cham_ip[@]}" "${remote_ips[@]}"
 
