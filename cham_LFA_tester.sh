@@ -113,8 +113,8 @@ function set_project {
 
 function get_ip {
     ips=($(openstack stack show $1 | gawk '/output_value:/{flag=1} ; / links|description /{flag=0} flag' | cut -f 3 -d "|"))
-    if [ "${#ips[@]}" -eq 32 ] && [ "${ips[1]}" != "''" ] && [ "${ips[29]}" != "''" ];then
-	echo -e ${ips[2]} "\n"${ips[27]} "\n"${ips[29]} "\n"${ips[31]}
+    if [ "${#ips[@]}" -eq 32 ] && [ "${ips[1]}" != "''" ] && [ "${ips[27]}" != "''" ];then
+	echo -e ${ips[1]} "\n"${ips[27]} "\n"${ips[29]} "\n"${ips[31]}
     else
 	exit 3
     fi
@@ -184,93 +184,97 @@ function run_cl_within {
     tmux attach -t "cham_dtn_tester"
 }
 
-if [ "$1" = "uc" ] || [ "$1" = "tacc" ] ; then
-    set_cc_site $1
-else    
-    echo "Please specify either uc or tacc as site name"
-    echo "Usage : $0 {uc | tacc} {sl | cha}"
-    exit 0
-fi
-
-if [ "$2" != "sl" ] && [ "$2" != "cha" ] && [ "$2" != "" ]; then
-    echo "Please specify either sl or cha as testing site name"
-    echo "Usage : $0 {uc | tacc} [sl | cha]"
-    exit 1
-fi
-
-if [ -z "$stack_name" ] || [ -z "$tester_stack_name" ] ; then
-    echo "Please set \$stack_name and \$tester_stack_name in the script."
-    exit 8
-fi
-
-echo "Checking dependency"
-check_dependency
-
-echo "Checking Authentication"
-set_auth
-
-set_project
-
-echo "Getting IP from $1"
-cham_ip=($(get_ip "$stack_name"))
-
-if [ "$?" -ne "0" ]; then
-    echo "cannot find IP from stack $stack_name in $1. Please check $stack_name is running in $1"
-    exit 3
-fi
-
-if [ "$2" = "" ]; then
-    echo "Running test within site cc@$1"
-    tmux kill-session -t "cham_dtn_server"  > /dev/null 2>&1
-    tmux kill-session -t "cham_dtn_tester"  > /dev/null 2>&1
-
-    remote_ips=($(get_ip "$tester_stack_name"))
-
-    echo "Starting server"
-    run_server "${remote_ips[@]}"
-    sleep 3
-  
-    run_cl "${cham_ip[@]}" "${remote_ips[@]}"
-
-    echo "Stopping server" 
-    tmux kill-session -t "cham_dtn_server" 
-    
-elif [ "$2" = "sl" ]; then
-    run_cl_sl "${cham_ip[@]}" "$SL_DTN" "${SL_DTN_PORTS[@]}"
-elif [ "$2" = "cha" ]; then 
-    if [ "$1" = "tacc" ]; then
-	echo "Getting IP from uc"
-	set_cc_site "uc"
-	    
-    	remote_ips=($(get_ip "$stack_name"))
-
-   	if [ "$?" -ne "0" ]; then
-	   echo "cannot find IP from stack $stack_name in uc. Please check $stack_name is running in uc"
-	   exit 3
-   	fi
-
-    else
-	echo "Getting IP from tacc"
-	set_cc_site "tacc"
-	
-    	remote_ips=($(get_ip "$stack_name"))
-
-   	if [ "$?" -ne "0" ]; then
-	   echo "cannot find IP from stack $stack_name in tacc. Please check $stack_name is running in tacc"
-	   exit 3
-   	fi
-
+function main {
+    if [ "$1" = "uc" ] || [ "$1" = "tacc" ] ; then
+	set_cc_site $1
+    else    
+	echo "Please specify either uc or tacc as site name"
+	echo "Usage : $0 {uc | tacc} {sl | cha}"
+	exit 0
     fi
 
-    tmux kill-session -t "cham_dtn_server"  > /dev/null 2>&1
-    tmux kill-session -t "cham_dtn_tester"  > /dev/null 2>&1
+    if [ "$2" != "sl" ] && [ "$2" != "cha" ] && [ "$2" != "" ]; then
+	echo "Please specify either sl or cha as testing site name"
+	echo "Usage : $0 {uc | tacc} [sl | cha]"
+	exit 1
+    fi
 
-    echo "Starting server"
-    run_server "${remote_ips[@]}"
-    sleep 1
+    if [ -z "$stack_name" ] || [ -z "$tester_stack_name" ] ; then
+	echo "Please set \$stack_name and \$tester_stack_name in the script."
+	exit 8
+    fi
     
-    run_cl "${cham_ip[@]}" "${remote_ips[@]}"
+    echo "Checking dependency"
+    check_dependency
 
-    echo "Stopping server" 
-    tmux kill-session -t "cham_dtn_server" 
-fi
+    echo "Checking Authentication"
+    set_auth
+
+    set_project
+
+    echo "Getting IP from $1"
+    cham_ip=($(get_ip "$stack_name"))
+    echo "${cham_ip[@]}"
+    if [ "$?" -ne "0" ]; then
+	echo "cannot find IP from stack $stack_name in $1. Please check $stack_name is running in $1"
+	exit 3
+    fi
+
+    if [ "$2" = "" ]; then
+	echo "Running test within site cc@$1"
+	tmux kill-session -t "cham_dtn_server"  > /dev/null 2>&1
+	tmux kill-session -t "cham_dtn_tester"  > /dev/null 2>&1
+
+	remote_ips=($(get_ip "$tester_stack_name"))
+	echo "${remote_ips[@]}"
+	echo "Starting server"
+	run_server "${remote_ips[@]}"
+	sleep 3
+	
+	run_cl "${cham_ip[@]}" "${remote_ips[@]}"
+
+	echo "Stopping server" 
+	tmux kill-session -t "cham_dtn_server" 
+	
+    elif [ "$2" = "sl" ]; then
+	run_cl_sl "${cham_ip[@]}" "$SL_DTN" "${SL_DTN_PORTS[@]}"
+    elif [ "$2" = "cha" ]; then 
+	if [ "$1" = "tacc" ]; then
+	    echo "Getting IP from uc"
+	    set_cc_site "uc"
+	    
+    	    remote_ips=($(get_ip "$stack_name"))
+
+   	    if [ "$?" -ne "0" ]; then
+		echo "cannot find IP from stack $stack_name in uc. Please check $stack_name is running in uc"
+		exit 3
+   	    fi
+
+	else
+	    echo "Getting IP from tacc"
+	    set_cc_site "tacc"
+	    
+    	    remote_ips=($(get_ip "$stack_name"))
+
+   	    if [ "$?" -ne "0" ]; then
+		echo "cannot find IP from stack $stack_name in tacc. Please check $stack_name is running in tacc"
+		exit 3
+   	    fi
+
+	fi
+
+	tmux kill-session -t "cham_dtn_server"  > /dev/null 2>&1
+	tmux kill-session -t "cham_dtn_tester"  > /dev/null 2>&1
+
+	echo "Starting server"
+	run_server "${remote_ips[@]}"
+	sleep 1
+	
+	run_cl "${cham_ip[@]}" "${remote_ips[@]}"
+
+	echo "Stopping server" 
+	tmux kill-session -t "cham_dtn_server" 
+    fi
+}
+
+main $@
