@@ -113,8 +113,8 @@ function set_project {
 
 function get_ip {
     ips=($(openstack stack show $1 | gawk '/output_value:/{flag=1} ; / links|description /{flag=0} flag' | cut -f 3 -d "|"))
-    if [ "${#ips[@]}" -eq 34 ] && [ "${ips[2]}" != "''" ] && [ "${ips[29]}" != "''" ];then
-	echo -e ${ips[2]} "\n"${ips[29]} "\n"${ips[31]} "\n"${ips[33]}
+    if [ "${#ips[@]}" -eq 32 ] && [ "${ips[1]}" != "''" ] && [ "${ips[29]}" != "''" ];then
+	echo -e ${ips[2]} "\n"${ips[27]} "\n"${ips[29]} "\n"${ips[31]}
     else
 	exit 3
     fi
