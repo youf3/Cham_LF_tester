@@ -70,18 +70,19 @@ def install_required_packages():
             command = 'sudo yum install -y libnl3-devel pkg-config'
 
         elif 'Ubuntu' in distro_name or 'Debian' in distro_name:
-            command = 'sudo apt-get install -y libnl-3-dev libnl-route-3-dev python3-pip pkg-config'
+            command = 'sudo apt-get install -y libnl-3-dev libnl-route-3-dev python3-pip pkg-config python3-dev'
         
         out, err = run_command(command)
         if err != '':
             print(err)
             return False
         print(out)
-
-        command = 'sudo pip3 install pyroute2 ethtool'
+        print('install pip3')
+        command = 'sudo pip3 install setuptools & sudo pip3 install pyroute2 ethtool'
         out, err = run_command(command)
         if err != '':
             print(err)
+            print(out)
             return False
         print(out)
         sleep(5)
