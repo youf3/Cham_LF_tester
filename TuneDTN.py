@@ -1,9 +1,4 @@
-
-# coding: utf-8
-
-# In[ ]:
-
-
+import time
 import getpass
 import subprocess
 import shlex
@@ -81,6 +76,7 @@ def install_required_packages():
                 #     return False
                 print('error:', err)
                 print(out)
+        time.sleep(1)
         
 def test_password():
     command = 'sudo su'
