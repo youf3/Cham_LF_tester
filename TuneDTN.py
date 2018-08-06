@@ -24,14 +24,6 @@ tcp_params = {
 
 interfaces = ['eno1']
 
-# def create_temp_file(filename, sysctl_conf):
-#     with open(filename, 'w') as f:
-#         for conf in sysctl_conf:
-#             value = sysctl_conf[conf]
-#             if isinstance(value, list):
-#                 value = ' '.join(str(v) for v in value)
-#             f.write('{0} = {1}\n'.format(conf,value))
-
 def run_command(cmd, ignore_stderr = False):
     proc = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, 
                                 stderr=subprocess.PIPE)
@@ -61,32 +53,34 @@ def run_command(cmd, ignore_stderr = False):
 def install_required_packages():
     global pyroute2
     global ethtool
-    try:        
-        import pyroute2, ethtool        
-    except ImportError:
-        print('Installing required packages....')
-        distro_name = platform.linux_distribution()[0]
-        if 'CentOS' in distro_name or 'Red Hat' in distro_name:
-            command = 'sudo yum install -y libnl3-devel pkg-config'
+    while True:
+        try:        
+            import pyroute2, ethtool
+            break
+        except ImportError:
+            print('Installing required packages....')
+            distro_name = platform.linux_distribution()[0]
+            if 'CentOS' in distro_name or 'Red Hat' in distro_name:
+                command = 'sudo yum install -y libnl3-devel pkg-config'
 
-        elif 'Ubuntu' in distro_name or 'Debian' in distro_name:
-            command = 'sudo apt-get install -y libnl-3-dev libnl-route-3-dev python3-pip pkg-config python3-dev'
-        
-        out, err = run_command(command)
-        if err != '':
-            print(err)
-            return False
-        print(out)
-        print('install pip3')
-        command = 'sudo pip3 install setuptools & sudo pip3 install pyroute2 ethtool'
-        out, err = run_command(command)
-        if err != '':
-            print(err)
-            print(out)
-            return False
-        print(out)
-        sleep(5)
-        import pyroute2, ethtool
+            elif 'Ubuntu' in distro_name or 'Debian' in distro_name:
+                command = 'sudo apt-get install -y libnl-3-dev libnl-route-3-dev python3-pip pkg-config python3-dev'
+            
+                out, err = run_command(command)
+                if err != '':
+                    print(err)
+                    return False
+                print(out)
+                print('install pip3')
+                command = 'sudo pip3 install setuptools & sudo pip3 install pyroute2 ethtool'
+                out, err = run_command(command)
+                # if err != b'':
+                #     print('error:', err)
+                #     #print(out)
+                #     print('returning false')                    
+                #     return False
+                print('error:', err)
+                print(out)
         
 def test_password():
     command = 'sudo su'
@@ -293,7 +287,7 @@ if __name__ == '__main__':
     
     if test_password():
         install_required_packages()
-
+        
         for interface in interfaces:
              suite = unittest.TestLoader().loadTestsFromTestCase(TuningTest)
              test_result = unittest.TextTestRunner().run(suite)
