@@ -67,7 +67,7 @@ def install_required_packages():
                     return False
                 print(out)
                 print('install pip3')
-                command = 'sudo pip3 install setuptools & sudo pip3 install pyroute2 ethtool'
+                command = 'sudo pip3 install setuptools wheel & sudo pip3 install pyroute2 ethtool'
                 out, err = run_command(command)
                 # if err != b'':
                 #     print('error:', err)
