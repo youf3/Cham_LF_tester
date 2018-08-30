@@ -17,7 +17,7 @@ tcp_params = {
         'net.core.default_qdisc' : 'fq'
         }
 
-interfaces = ['eno1']
+interfaces = ['enp33s0f0.2038']
 
 def run_command(cmd, ignore_stderr = False):
     proc = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, 
@@ -55,27 +55,31 @@ def install_required_packages():
         except ImportError:
             print('Installing required packages....')
             distro_name = platform.linux_distribution()[0]
+            print(distro_name)
             if 'CentOS' in distro_name or 'Red Hat' in distro_name:
-                command = 'sudo yum install -y libnl3-devel pkg-config'
+                command = 'sudo yum install -y libnl3-devel pkg-config pciutils'
+                pip_cmd = 'pip'
 
             elif 'Ubuntu' in distro_name or 'Debian' in distro_name:
                 command = 'sudo apt-get install -y libnl-3-dev libnl-route-3-dev python3-pip pkg-config python3-dev'
+                pip_cmd = 'pip3'
             
-                out, err = run_command(command)
-                if err != '':
-                    print(err)
-                    return False
-                print(out)
-                print('install pip3')
-                command = 'sudo pip3 install setuptools wheel & sudo pip3 install pyroute2 ethtool'
-                out, err = run_command(command)
-                # if err != b'':
-                #     print('error:', err)
-                #     #print(out)
-                #     print('returning false')                    
-                #     return False
-                print('error:', err)
-                print(out)
+            out, err = run_command(command)
+            if err != '':
+                print(err)
+                return False
+            print(out)
+            print('install pip')
+            command = 'sudo env "PATH=$PATH" {0} install setuptools wheel pyroute2 ethtool'.format(pip_cmd)
+            print(command)
+            out, err = run_command(command)
+            # if err != b'':
+            #     print('error:', err)
+            #     #print(out)
+            #     print('returning false')                    
+            #     return False
+            print('error:', err)
+            print(out)
         time.sleep(1)
         
 def test_password():
@@ -264,6 +268,7 @@ class TuningTest(unittest.TestCase):
         
         command = 'sudo setpci -s {0} 68.w'.format(cls.bus)
         output, error = run_command(command)
+        print(output)
         cls.assertEqual(output[0], '5')
             
     def test_connectx_5(cls):              
