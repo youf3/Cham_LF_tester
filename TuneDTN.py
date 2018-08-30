@@ -268,17 +268,18 @@ class TuningTest(unittest.TestCase):
         
         command = 'sudo setpci -s {0} 68.w'.format(cls.bus)
         output, error = run_command(command)
-        print(output)
+        #print(output)
         cls.assertEqual(output[0], '5')
             
     def test_connectx_5(cls):              
-        if cls.phy_int == None : cls.fail('No interface {}'.format(cls.interface))        
+        if cls.phy_int == None : cls.fail('No interface {}'.format(cls.interface)) 
              
         if cls.driver != 'mlx5_core': cls.skipTest('This is not Mellanox ConnectX-4 or X-5')        
         
         command = 'lspci -s {0}'.format(cls.bus)
-        output,error = run_command(command)        
-        if '[ConnectX-5]' not in output: cls.skipTest('This is not ConnectX-5')
+        output,error = run_command(command)
+        
+        if '[ConnectX-5' not in output: cls.skipTest('This is not ConnectX-5')
             
         ring_param = ethtool.get_ringparam(cls.phy_int)        
         cls.assertEqual(ring_param['rx_pending'], 8192)
