@@ -1,10 +1,10 @@
 import time
 import getpass
 import subprocess
-import shlex
-import sys
 import platform
 import re
+import pyroute2, ethtool
+import argparse
 
 tcp_params = {
         'net.core.rmem_max' : 2147483647,
@@ -16,8 +16,6 @@ tcp_params = {
         'net.ipv4.tcp_mtu_probing' : 1,
         'net.core.default_qdisc' : 'fq'
         }
-
-interfaces = ['enp33s0f0.2038']
 
 def run_command(cmd, ignore_stderr = False):
     proc = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, 
@@ -45,43 +43,6 @@ def run_command(cmd, ignore_stderr = False):
         
     return [str(outs,'UTF-8'), str(errs,'UTF-8')]
 
-def install_required_packages():
-    global pyroute2
-    global ethtool
-    while True:
-        try:        
-            import pyroute2, ethtool
-            break
-        except ImportError:
-            print('Installing required packages....')
-            distro_name = platform.linux_distribution()[0]
-            print(distro_name)
-            if 'CentOS' in distro_name or 'Red Hat' in distro_name:
-                command = 'sudo yum install -y libnl3-devel pkg-config pciutils'
-                pip_cmd = 'pip'
-
-            elif 'Ubuntu' in distro_name or 'Debian' in distro_name:
-                command = 'sudo apt-get install -y libnl-3-dev libnl-route-3-dev python3-pip pkg-config python3-dev'
-                pip_cmd = 'pip3'
-            
-            out, err = run_command(command)
-            if err != '':
-                print(err)
-                return False
-            print(out)
-            print('install pip')
-            command = 'sudo env "PATH=$PATH" {0} install setuptools wheel pyroute2 ethtool'.format(pip_cmd)
-            print(command)
-            out, err = run_command(command)
-            # if err != b'':
-            #     print('error:', err)
-            #     #print(out)
-            #     print('returning false')                    
-            #     return False
-            print('error:', err)
-            print(out)
-        time.sleep(1)
-        
 def test_password():
     command = 'sudo su'
     out, err = run_command(command)
@@ -118,13 +79,18 @@ def get_mtu(interface):
     link = ip.link("get", index=ip.link_lookup(ifname=interface)[0])[0]
     MTU = int((list(filter(lambda x:x[0]=='IFLA_MTU', link['attrs'])))[0][1])
     return MTU
+
+def get_numa(phy_int):
+    command = 'cat /sys/class/net/{0}/device/numa_node'.format(phy_int)
+    output, error = run_command(command)
+    if error != '':
+        print("Cannot find NUMA Node for {0}".format(phy_int))
+        return None
+    return str(output).strip()
     
     
 def tune_sysctl():
     print('Changing TCP buffer to 2GB')
-    #conf_file = 'DTN.conf'
-    #create_temp_file(conf_file, tcp_params)
-    #command = 'sudo -S cp {0} /etc/sysctl.d/ ; sudo sysctl --system' # -S as it enables input from stdin
     command = ''
     for param in tcp_params:
         if isinstance(tcp_params[param], list):
@@ -136,10 +102,9 @@ def tune_sysctl():
     if errs != '':
         print(errs)
 
-def tune_fq(interface):
+def tune_fq(phy_int):
     print('Setting fq')
-    phy_int = get_phy_int(interface)
-    command = 'sudo tc qdisc add dev {} root fq'.format(phy_int)
+    command = 'tc qdisc del dev {0} root fq; sudo tc qdisc add dev {0} root fq'.format(phy_int)
     outs, errs = run_command(command)
     if errs != '':
         print(errs)
@@ -147,63 +112,91 @@ def tune_fq(interface):
 def tune_mtu(interface):
     print('Changing MTU to 9k')
     phy_int = get_phy_int(interface)
-    command = 'sudo ip link set dev {0} mtu 9000'.format(phy_int)
+    command = 'ip link set dev {0} mtu 9000'.format(phy_int)
     if phy_int != interface:        
         command += '; sudo ip link set dev {0} mtu 9000'.format(interface)
     run_command(command)
 
 def tune_cpu_governer():
     print('Setting CPU Governor to Performance')
-    command = 'sudo sh -c \'echo performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor\''
+    command = 'sh -c \'echo performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor\''
     outs, errs = run_command(command)
     if errs != '':
         print(errs)
 
-def tune_mellanox(interface):    
+def tune_mellanox(phy_int):    
     print('Tunning Mellanox card')
-    phy_int = get_phy_int(interface)
     bus = ethtool.get_businfo(phy_int)
-    
-    command = 'sudo setpci -s {0} 68.w'.format(bus)
+    numa = get_numa(phy_int)
+    print(numa)
+    command = 'setpci -s {0} 68.w'.format(bus)
     output, error = run_command(command)
     
     tempstr = list(output)
     tempstr[0] = '5'    
     maxredreq = ''.join(tempstr)    
         
-    command = 'sudo setpci -s {0} 68.w={1}'.format(bus, maxredreq)
+    command = 'setpci -s {0} 68.w={1}'.format(bus, maxredreq)
     output, error = run_command(command)
     
     if error != '':
         print(error)
         
     command = 'sudo mlnx_tune -p HIGH_THROUGHPUT'
-    output, error = run_command(command, ignore_stderr= True)
+    # output, error = run_command(command, ignore_stderr= True)
     
+    if error != '':
+        print(error)
+    #print(output)
+    
+def tune_ring_buf(phy_int):
+    print('Tunning ring param for ConnectX-4 and 5')
+    ring = ethtool.get_ringparam(phy_int)
+    ring['rx_pending'] = 8192
+    ring['tx_pending'] = 8192
+    ethtool.set_ringparam(phy_int, ring)
+
+def tune_flow_control(phy_int):
+    print('Turning flow_control on')
+    
+    command = 'sudo ethtool -A {0} tx on rx on'.format(phy_int)
+    output, error = run_command(command)
+
     if error != '':
         print(error)
     print(output)
-    
-def tune_ring_buf(interface):
-    print('Tunning ring param for ConnectX-5')
+
+def tune_irqbalance(interface):
+    print('Turning irqbalance off')
     phy_int = get_phy_int(interface)
-    command = 'sudo ethtool -G {0} tx {1} rx {1}'.format(phy_int, 8192)
-    output, error = run_command(command)
+    numa = get_numa(phy_int)
     
+    command = 'systemctl stop irqbalance'
+    output, error = run_command(command)
+
     if error != '':
         print(error)
+    #print(output)
+    
+    command = '/usr/sbin/set_irq_affinity_bynode.sh {0} {1}'.format(numa, phy_int)
+    print(command)
+    output, error = run_command(command) 
+    if error != '':
+        print(error)
+    print(output)
+   
 
 import unittest
 
 class TuningTest(unittest.TestCase):    
     
-    @classmethod
-    def setUpClass(cls):
-        cls.interface = interface
-        cls.phy_int = get_phy_int(cls.interface) 
-        if cls.phy_int == None: raise Exception("There is no interface {0}".format(interface))
-        cls.driver = ethtool.get_module(cls.phy_int)
-        cls.bus = ethtool.get_businfo(cls.phy_int)
+    def __init__(self, testname, interface):
+        super(TuningTest, self).__init__(testname)
+        self.interface = interface
+        self.phy_int = get_phy_int(self.interface) 
+        if self.phy_int == None: raise Exception("There is no interface {0}".format(interface))
+        self.driver = ethtool.get_module(self.phy_int)
+        self.bus = ethtool.get_businfo(self.phy_int)
     
     def test_sysctl_value(self):
         for command in tcp_params:
@@ -222,18 +215,18 @@ class TuningTest(unittest.TestCase):
                 print(error)
                 self.fail(error)
                 
-    def test_fq(cls):        
-        command = 'tc qdisc show dev {}'.format(cls.phy_int)
+    def test_fq(self):        
+        command = 'tc qdisc show dev {}'.format(self.phy_int)
         output, error = run_command(command)
         if error != '':
             print(error)
-            
-        cls.assertIn('qdisc fq', output)
+        qm=output.split(' ')[1]
+        self.assertEqual('fq', qm)
     
-    def test_mtu(cls):        
-        if cls.phy_int != cls.interface:
-            cls.assertGreaterEqual(get_mtu(cls.interface), 9000)       
-        cls.assertGreaterEqual(get_mtu(cls.phy_int), 9000)
+    def test_mtu(self):        
+        if self.phy_int != self.interface:
+            self.assertGreaterEqual(get_mtu(self.interface), 9000)       
+        self.assertGreaterEqual(get_mtu(self.phy_int), 9000)
         
     def test_cpu_governor(self):
         command = 'cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor'
@@ -248,69 +241,110 @@ class TuningTest(unittest.TestCase):
             self.skipTest('No CPU scaling governer found.')
         else: self.fail(error)
             
-    def test_pci_speed(cls):
-        command = 'sudo lspci -vvv -s {}'.format(cls.bus)
+    def test_pci_speed(self):
+        command = 'sudo lspci -vvv -s {}'.format(self.bus)
         output, error = run_command(command)
         
         if error == '':
             status = output.split('\n')
             #print(status)
             speed, width = get_link_cap(status)
-            cls.assertEqual(speed, 'Speed 8GT/s')
-            cls.assertEqual(width, ' Width x16')
+            self.assertEqual(speed, 'Speed 8GT/s')
+            self.assertEqual(width, ' Width x16')
         else:
-            cls.fail(error)
+            self.fail(error)
        
-    def test_meallnox_nic(cls):        
-        if cls.phy_int == None : cls.fail('No interface {}'.format(cls.interface))
+    def test_meallnox_nic(self):
+        if self.phy_int == None : self.fail('No interface {}'.format(self.interface))
                
-        if cls.driver != 'mlx5_core':  cls.skipTest('This is not Mellanox ConnectX-4 or X-5')            
+        if self.driver != 'mlx5_core':  self.skipTest('This is not Mellanox ConnectX-4 or X-5')            
         
-        command = 'sudo setpci -s {0} 68.w'.format(cls.bus)
+        command = 'sudo setpci -s {0} 68.w'.format(self.bus)
         output, error = run_command(command)
         #print(output)
-        cls.assertEqual(output[0], '5')
+        self.assertEqual(output[0], '5')
             
-    def test_connectx_5(cls):              
-        if cls.phy_int == None : cls.fail('No interface {}'.format(cls.interface)) 
+    def test_connectx_5(self):
+        if self.phy_int == None : self.fail('No interface {}'.format(self.interface))        
              
-        if cls.driver != 'mlx5_core': cls.skipTest('This is not Mellanox ConnectX-4 or X-5')        
+        if self.driver != 'mlx5_core': self.skipTest('This is not Mellanox ConnectX-4 or X-5')        
         
-        command = 'lspci -s {0}'.format(cls.bus)
-        output,error = run_command(command)
-        
-        if '[ConnectX-5' not in output: cls.skipTest('This is not ConnectX-5')
+        command = 'lspci -s {0}'.format(self.bus)
+        output,error = run_command(command)        
+        if '[ConnectX-5' not in output and '[ConnectX-4' not in output : self.skipTest('This is not ConnectX-5')
             
-        ring_param = ethtool.get_ringparam(cls.phy_int)        
-        cls.assertEqual(ring_param['rx_pending'], 8192)
-        cls.assertEqual(ring_param['tx_pending'], 8192)
+        ring_param = ethtool.get_ringparam(self.phy_int)
+        self.assertEqual(ring_param['rx_pending'], 8192)
+        self.assertEqual(ring_param['tx_pending'], 8192)
+
+    def test_flow_control(self):
+        if self.phy_int == None : self.fail('No interface {}'.format(self.interface))
+        
+        command = 'ethtool -a {0}'.format(self.phy_int)
+        output,error = run_command(command)
+        for line in output.split('\n'):
+            if 'RX:' in line:
+                rx = line.split('\t')[-1]
+                self.assertEqual(rx,'on')
+            elif 'TX:' in line:
+                tx = line.split('\t')[-1]
+                self.assertEqual(tx,'on')
+        
+    def test_irqbalance(self):
+        command = 'systemctl status irqbalance'
+        output,error = run_command(command)
+        for line in output.split('\n'):
+            if 'Active:' in line:
+                rx = line.split(' ')[4]
+                self.assertEqual(rx,'inactive')
+
+def main(interfaces):
+    tuned_int = []
+        
+    for interface in interfaces:
+        phy_int = get_phy_int(interface)
+        if phy_int is None:
+            print("Cannot find interface {0}. Ignoring {0}..".format(interface))
+            continue
+        if phy_int not in tuned_int:
+            tune_irqbalance(phy_int)
+            tuned_int.append(phy_int)
+        #suite = unittest.TestLoader().loadTestsFromTestCase(TuningTest)
+        test_loader = unittest.TestLoader()
+        test_names = test_loader.getTestCaseNames(TuningTest)
+        suite = unittest.TestSuite()
+        for test_name in test_names:            
+            suite.addTest(TuningTest(test_name, interface))
+        test_result = unittest.TextTestRunner(verbosity=2).run(suite)
+                
+        for failure in test_result.failures:
+            testname = failure[0].id().split(".")[-1]
+            if testname == 'test_sysctl_value':
+                tune_sysctl()
+            elif testname == 'test_fq':
+                tune_fq(phy_int)
+            elif testname == 'test_mtu':
+                tune_mtu(interface)
+            elif testname == 'test_cpu_governor':
+                tune_cpu_governer()
+            elif testname == 'test_meallnox_nic':
+                tune_mellanox(phy_int)
+            elif testname == 'test_connectx_5':
+                tune_ring_buf(phy_int)
+            elif testname == 'test_pci_speed':
+                print('Please check the PCI slot for {}'.format(interface))
+            elif testname == 'test_flow_control':
+                tune_flow_control(phy_int)
+            print('Done')
 
 if __name__ == '__main__':
-    
-    if test_password():
-        install_required_packages()
-        
-        for interface in interfaces:
-             suite = unittest.TestLoader().loadTestsFromTestCase(TuningTest)
-             test_result = unittest.TextTestRunner().run(suite)
+    ip = pyroute2.IPRoute()
+    indices = ip.link_lookup(operstate='UP')
+    interfaces = []
+    for index in indices:
+        interfaces.append(ip.link('get', index=index)[0].get_attr('IFLA_IFNAME'))
 
-             for failure in test_result.failures:
-                 testname = failure[0].id().split(".")[-1]
-                 if testname == 'test_sysctl_value':
-                     tune_sysctl()
-                 elif testname == 'test_fq':
-                     tune_fq(interface)
-                 elif testname == 'test_mtu':
-                     tune_mtu(interface)
-                 elif testname == 'test_cpu_governor':
-                     tune_cpu_governer()
-                 elif testname == 'test_meallnox_nic':
-                     tune_mellanox(interface)
-                 elif testname == 'test_connectx_5':
-                     tune_ring_buf(interface)
-                 elif testname == 'test_pci_speed':
-                     print('Please check the PCI slot for {}'.format(interface))
-                 print('Done')
-    else:
-        print('incorrect password. Quitting..')
-
+    parser = argparse.ArgumentParser()
+    parser.add_argument('interface', type=str, choices=interfaces, nargs='+', help='Interface to tune')
+    args = parser.parse_args()
+    main(args.interface)

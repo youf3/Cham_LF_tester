@@ -1,8 +1,21 @@
 #!/bin/bash
 
-nic=eno1
-delay=100
+nic=$1
+delay=$2
 jitter=3
+
+if [ -z $nic ]
+then
+    echo "Please provide 100G interface name"
+    echo "e.g.) ./set_network_delay.bash enp175s0"
+    exit
+fi
+
+if [ -z $delay ]
+then
+    delay=100
+fi
+
 
 
 if [ "$EUID" -ne 0 ]
