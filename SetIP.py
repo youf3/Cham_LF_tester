@@ -1,7 +1,7 @@
 import ptvsd
 import netifaces
 import subprocess, shlex
-import pyroute2
+import pyroute2, socket
 import ping3
 
 def setup(ip_addr):
@@ -40,13 +40,19 @@ def check_available_ip():
 
 def setup_ip_addr(system_model):
     if system_model == 'PowerEdge R630':
-        interface = 'enp3s0f1'
+        interface = 'enp3s0f1'        
     elif system_model == 'PowerEdge R740xd':
         interface = 'enp175s0'
 
     temp_ip = '192.168.0.1'
 
     ipr = pyroute2.IPRoute()
+    def_route = ipr.get_default_routes(family=socket.AF_INET)
+    route_to_temp = ipr.route('get', dst=temp_ip)
+
+    if route_to_temp[0].get_attrs('RTA_OIF')[0] is not def_route[0].get_attrs('RTA_OIF')[0]:
+        raise Exception('An IP address already exists in 192.168.0.0/24')
+
     pr_index = ipr.link_lookup(ifname=interface, operstate='UP')
     if len(pr_index) != 1:
         raise Exception('No 100G interface with a connection found')
@@ -56,7 +62,7 @@ def setup_ip_addr(system_model):
 
     ipr.addr('del', index=pr_index, address=temp_ip, mask=24)
     ipr.addr('add', index=pr_index, address=address, mask=24)
-    print('100G interface is "{}". IP address is set to {}'.format(interface,address))
+    print('IP address is set to {}'.format(address))
 
 if __name__ == '__main__':    
     # setup('10.140.80.3')
