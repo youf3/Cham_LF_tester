@@ -40,8 +40,7 @@ def check_available_ip():
 
 def setup_ip_addr(system_model):
     if system_model == 'PowerEdge R630':
-        #interface = 'enp3s0f1'
-        interface = 'enp3s0'
+        interface = 'enp3s0f1'
     elif system_model == 'PowerEdge R740xd':
         interface = 'enp175s0'
 
