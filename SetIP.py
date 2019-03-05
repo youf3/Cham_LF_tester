@@ -56,7 +56,7 @@ def setup_ip_addr(system_model):
 
     ipr.addr('del', index=pr_index, address=temp_ip, mask=24)
     ipr.addr('add', index=pr_index, address=address, mask=24)
-    print('IP address is set to {}'.format(address))
+    print('100G interface is "{}". IP address is set to {}'.format(interface,address))
 
 if __name__ == '__main__':    
     # setup('10.140.80.3')
